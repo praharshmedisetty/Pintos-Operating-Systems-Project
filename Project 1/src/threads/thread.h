@@ -90,6 +90,12 @@ struct thread
     int priority;                       /* Priority. */
     struct list_elem allelem;           /* List element for all threads list. */
 
+    // Phase 2 Addition
+    // Declaring a variable in the struct thread
+    // int64_t : typedef signed long int64_t from the stdint.h library
+    // thread_sleep_ticks: variable to hold ticks from OS boot time, until a thread unblocks from sleep
+    int64_t thread_sleep_ticks;
+
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
 
@@ -137,5 +143,11 @@ int thread_get_nice (void);
 void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
+
+// Phase 2 Addition
+// Function declaration to compare the thread sleep time of two threads
+// declared this function in thread header (thread.h) instead of thread.c
+// because timer.c uses the function using struct thread
+bool compare_thread_sleep(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
 
 #endif /* threads/thread.h */

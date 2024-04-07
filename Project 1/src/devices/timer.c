@@ -30,6 +30,10 @@ static void busy_wait (int64_t loops);
 static void real_time_sleep (int64_t num, int32_t denom);
 static void real_time_delay (int64_t num, int32_t denom);
 
+// Phase 2 Addition
+// sleep_list : list to store the sleeping threads
+struct list sleep_list;
+
 /* Sets up the timer to interrupt TIMER_FREQ times per second,
    and registers the corresponding interrupt. */
 void
@@ -37,6 +41,12 @@ timer_init (void)
 {
   pit_configure_channel (0, 2, TIMER_FREQ);
   intr_register_ext (0x20, timer_interrupt, "8254 Timer");
+
+  // Phase 2 Addition
+  // Initializes sleep list as an empty list
+  // list_init declared in src/lib/list.c
+  list_init(&sleep_list);
+
 }
 
 /* Calibrates loops_per_tick, used to implement brief delays. */
@@ -92,8 +102,35 @@ timer_sleep (int64_t ticks)
   int64_t start = timer_ticks ();
 
   ASSERT (intr_get_level () == INTR_ON);
+  
+  // Phase 2 Change
+  // Eliminating busy waiting
+
+  /*
   while (timer_elapsed (start) < ticks) 
-    thread_yield ();
+    thread_yield (); 
+  */
+
+  // Phase 2 Addition
+  // struct thread defined in thread.h file
+  struct thread *t = thread_current();
+
+  /* timer_ticks(): Returns the number of timer ticks since the OS booted. */
+  /* ticks = Number of timer ticks since OS booted. */
+  t -> thread_sleep_ticks = timer_ticks() + ticks;
+
+  // Disable interrupts for insertion into sleep_list 
+  enum intr_level old_level = intr_disable();
+
+  // Ordered list insertion into the thread sleep queue in the order of sleep tick values
+  list_insert_ordered(&sleep_list, &t->elem, compare_thread_sleep, NULL);
+
+  // block the thread instead of busy waiting
+  thread_block();
+
+  // reset the interrupt status back to the previous old level
+  intr_set_level(old_level);
+
 }
 
 /* Sleeps for approximately MS milliseconds.  Interrupts must be
@@ -172,6 +209,32 @@ timer_interrupt (struct intr_frame *args UNUSED)
 {
   ticks++;
   thread_tick ();
+
+  // Phase 2 Addition
+  // code to unblock the sleeping thread stored in the thread sleep queue
+  // list_begin: Returns the beginning of LIST, defined in src/lib/kernel/list.c
+  // sleep_list defined above
+  struct list_elem *thread_elem = list_begin(&sleep_list);
+  while(thread_elem != list_end(&sleep_list))
+  {
+    struct thread *t = list_entry(thread_elem, struct thread, elem);
+    
+    // check if ticks less than the thread sleep ticks count
+    // if true, then the thread remains blocked
+    if(ticks < t->thread_sleep_ticks)
+    break;
+    
+    // iterate over to the next sleeping thread in the sleeping queue
+    // list_next used from src/lib/kernel/list.c
+    thread_elem = list_next(thread_elem);
+
+    // list_pop_front used from src/lib/kernel/list.c
+    list_pop_front (&sleep_list);
+    
+    // thread_unblock unblocks the thread and executes
+    // this is performed only when the condition (t->thread_sleep_ticks < ticks) holds true
+    thread_unblock(t);
+  }
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer

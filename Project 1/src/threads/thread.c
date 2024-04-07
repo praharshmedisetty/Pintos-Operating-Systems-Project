@@ -618,3 +618,15 @@ compare_thread_priority (const struct list_elem *a,
   thread_b = list_entry(b, struct thread, elem);
   return thread_a -> priority > thread_b -> priority;
 }
+
+// Phase 2 Addition
+// function declaration added in thread.h for global access to variables using struct thread
+// Function definition to compare the thread sleep time of two threads
+bool compare_thread_sleep(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED)
+{
+  ASSERT(a != NULL);
+  ASSERT(b != NULL);
+  struct thread *t1 = list_entry (a, struct thread, elem);
+  struct thread *t2 = list_entry (b, struct thread, elem);
+  return t1->thread_sleep_ticks < t2->thread_sleep_ticks;
+}
