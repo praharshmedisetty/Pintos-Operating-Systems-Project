@@ -5,6 +5,12 @@
 #include <list.h>
 #include <stdint.h>
 
+
+// Phase 3 Addition: MLFQS
+// Including the fixedpoint header file to use fixed_point_t data type for 'recent_cpu'
+#include "threads/fixedpoint.h"
+// End Phase 3 Addition: MLFQS
+
 /* States in a thread's life cycle. */
 enum thread_status
   {
@@ -90,6 +96,27 @@ struct thread
     int priority;                       /* Priority. */
     struct list_elem allelem;           /* List element for all threads list. */
 
+
+    // Phase 3 Addition: Priority Donation
+    // defining actual_priority which stores the priority which will be used for priority donation purposes
+    int actual_priority;
+
+    // list of locks: contains the list of all locks which a threads holds 
+    struct list locks;
+
+    // pointer to identify the lock for which the thread is waiting
+    struct lock *wait_lock;
+    // End Phase 3 Addition: Priority Donation
+
+    // Phase 3 Addition: MLFQS
+    // declare an integer 'nice' that holds the niceness value of a thread. Value ranges between 20 and -20
+    int nice;
+
+    // recent cpu to measure how much CPU time each process has received recently
+    // fixed_point_t declared in "threads/fixedpoint.h" header file
+    fixed_point_t recent_cpu;
+    // End Phase 3 Addition: MLFQS
+
     // Phase 2 Addition
     // Declaring a variable in the struct thread
     // int64_t : typedef signed long int64_t from the stdint.h library
@@ -145,9 +172,30 @@ int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 
 // Phase 2 Addition
-// Function declaration to compare the thread sleep time of two threads
+// Function to compare the thread sleep time of two threads
 // declared this function in thread header (thread.h) instead of thread.c
 // because timer.c uses the function using struct thread
 bool compare_thread_sleep(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
+
+// Phase 3 Addition: Priority Donation
+// function definition to implement priority donation for a thread 
+void priority_donation(struct thread *, int);
+
+// Function to return actual priority after priority donation
+int get_actual_priority(struct thread *);
+
+// Function declaration to compare priorities of two threads
+bool compare_thread_priority(const struct list_elem *, const struct list_elem *, void *aux UNUSED);
+
+// Phase 3 Addition: MLFQS
+// Function Declaration to calculate 'recent_cpu'
+void get_recent_cpu(struct thread *ready_list_thread, void *aux UNUSED);
+
+// Function Declaration to calculate 'load_avg'
+void get_load_avg(struct thread *ready_list_thread);
+
+// Function Declaration to calculate new priority using the given formulas
+void mlfqs_thread_priority(struct thread *ready_list_thread, void *aux UNUSED);
+// End Phase 3 Addition: MLFQS
 
 #endif /* threads/thread.h */

@@ -9,6 +9,10 @@ struct semaphore
   {
     unsigned value;             /* Current value. */
     struct list waiters;        /* List of waiting threads. */
+    // Phase 3 Addition: Priority Donation
+    // priority of a semaphore
+    int64_t priority;
+    // End Phase 3 Addition: Priority Donation
   };
 
 void sema_init (struct semaphore *, unsigned value);
@@ -22,6 +26,12 @@ struct lock
   {
     struct thread *holder;      /* Thread holding lock (for debugging). */
     struct semaphore semaphore; /* Binary semaphore controlling access. */
+    // Phase 3 Addition: Priority Donation
+    // priority of the thread which acquired the lock
+    int priority;
+    // creating a list element for struct list locks
+    struct list_elem lock_element;
+    // End Phase 3 Addition: Priority Donation
   };
 
 void lock_init (struct lock *);
@@ -47,5 +57,14 @@ void cond_broadcast (struct condition *, struct lock *);
    optimization barrier.  See "Optimization Barriers" in the
    reference guide for more information.*/
 #define barrier() asm volatile ("" : : : "memory")
+
+
+// Phase 3 Addition: Priority Donation
+// function to compare priority of two semaphores
+bool compare_sema_priority(const struct list_elem *a,const struct list_elem *b,void *aux);
+
+// function to compare priorities of two locks
+bool compare_lock_priority(const struct list_elem *a,const struct list_elem *b,void *aux);
+// End Phase 3 Addition: Priority Donation
 
 #endif /* threads/synch.h */
