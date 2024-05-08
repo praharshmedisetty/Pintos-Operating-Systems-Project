@@ -21,6 +21,7 @@
 #include "threads/malloc.h"
 
 
+// Phase 2 Addition: Added timer.h to use timer_msleep()
 #include "devices/timer.h"
 
 static thread_func start_process NO_RETURN;
@@ -31,6 +32,7 @@ int argc=0;
 char **argv;
 
 
+// Phase 2 Addition: Variable initialized to make the process sleep for 'sleep_time_ms' milliseconds
 int64_t sleep_time_ms = 1000;
 
 void tokenize(const char file_name[]) {
