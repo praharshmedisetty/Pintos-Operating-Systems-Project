@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <round.h>
 #include "userprog/gdt.h"
 #include "userprog/pagedir.h"
 #include "userprog/tss.h"
@@ -17,9 +18,35 @@
 #include "threads/palloc.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
+#include "threads/malloc.h"
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
+void tokenize(const char file_name[]);
+
+int argc=0;
+char **argv;
+
+void tokenize(const char file_name[]) {
+
+    int file_len = strlen(file_name)+1;
+    char* token;
+    char *filename_copy, *next;
+
+    filename_copy = file_name;
+    argv = (char**)malloc(sizeof(char*));
+    token = strtok_r(filename_copy, " ", &next);
+
+    while(token){
+        argv[argc++] = token;
+        token = strtok_r(NULL, " ", &next);
+
+        // reallocating the memory
+        // for argv
+        argv = (char**)realloc(argv, (argc + 1) * sizeof(char*));
+    }
+
+}
 
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
@@ -31,15 +58,21 @@ process_execute (const char *file_name)
   char *fn_copy;
   tid_t tid;
 
+  // Tokenizing the file_name
+  tokenize(file_name);
+
   /* Make a copy of FILE_NAME.
      Otherwise there's a race between the caller and load(). */
   fn_copy = palloc_get_page (0);
   if (fn_copy == NULL)
     return TID_ERROR;
-  strlcpy (fn_copy, file_name, PGSIZE);
+
+  // First argument stores the file name
+  // Copying the first argument
+  strlcpy (fn_copy, argv[0], strlen(argv[0])+1);
 
   /* Create a new thread to execute FILE_NAME. */
-  tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
+  tid = thread_create (argv[0], PRI_DEFAULT, start_process, fn_copy);
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy); 
   return tid;
@@ -88,6 +121,8 @@ start_process (void *file_name_)
 int
 process_wait (tid_t child_tid UNUSED) 
 {
+  // infinite loop
+  while(true);
   return -1;
 }
 
@@ -424,6 +459,72 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
   return true;
 }
 
+void push_values_to_stack(void **esp, char **val_addr) {
+
+    int size=0;
+    int itr;
+
+    for(itr=argc-1; itr>=0; itr--) {
+        *esp -= (strlen(argv[itr]) + 1);
+        strlcpy((char *)*esp, argv[itr], strlen(argv[itr]) + 1);
+
+        size += strlen(argv[itr]) + 1;
+        val_addr[itr] = (char *)*esp;
+    }
+
+    // Aligning stack pointer to 
+    // multiples of 4
+    int ceil_value = DIV_ROUND_UP(size, 4);
+    int word_algn_padd = (4*ceil_value) - size;
+
+    *esp -= word_algn_padd;
+}
+
+void push_null_sentinel(void **esp){
+    *esp -= 4;
+    (*(int*)(*esp)) = 0;
+}
+
+char * push_val_addrs(void **esp, char **val_addr) {
+    int itr;
+
+    for(itr=argc-1; itr>=0; itr--){
+        *esp -= sizeof(val_addr[itr]);
+        *(int *)*esp = (int)val_addr[itr];
+    }
+
+    return (char *)*esp;
+}
+
+void push_first_arg_addr(void **esp, char *addr) {
+    *esp -= sizeof(addr);
+    (*(int *)(*esp)) = (int)addr;
+}
+
+void push_arg_count(void **esp) {
+    *esp -= sizeof(argc);
+    (*(int *)(*esp)) = argc;
+}
+
+void push_return_value(void **esp) {
+    int retVal=0;
+
+    *esp -= sizeof(retVal);
+    (*(int *)*esp) = retVal;
+}
+
+void push_arg_to_stack(void **esp){
+    char *val_addr[argc];
+    char *first_arg_addr;
+
+    push_values_to_stack(esp, val_addr);
+    push_null_sentinel(esp);
+    first_arg_addr = push_val_addrs(esp, val_addr);
+    push_first_arg_addr(esp, first_arg_addr);
+    push_arg_count(esp);
+    push_return_value(esp);
+}
+
 /* Create a minimal stack by mapping a zeroed page at the top of
    user virtual memory. */
 static bool
@@ -436,8 +537,10 @@ setup_stack (void **esp)
   if (kpage != NULL) 
     {
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
-      if (success)
+      if (success){
         *esp = PHYS_BASE;
+        push_arg_to_stack(esp);
+      }
       else
         palloc_free_page (kpage);
     }
