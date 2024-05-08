@@ -20,12 +20,18 @@
 #include "threads/vaddr.h"
 #include "threads/malloc.h"
 
+
+#include "devices/timer.h"
+
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
 void tokenize(const char file_name[]);
 
 int argc=0;
 char **argv;
+
+
+int64_t sleep_time_ms = 1000;
 
 void tokenize(const char file_name[]) {
 
@@ -121,8 +127,7 @@ start_process (void *file_name_)
 int
 process_wait (tid_t child_tid UNUSED) 
 {
-  // infinite loop
-  while(true);
+  timer_msleep(sleep_time_ms);
   return -1;
 }
 
